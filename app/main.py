@@ -8,7 +8,7 @@ import plotly.express as px
 
 st.set_page_config(page_title="チェックシートアプリ", layout="wide")
 
-# --- 質問と選択肢の定義 ---
+# --- 質問と選択肢 ---
 COMMON_QUESTIONS_TEXT = [
     "C-1. 過去24か月以上の月次P/Lデータを抽出できますか？",
     "C-2. 製品・得意先・部門など粒度を保ったままP/Lを切り出せますか？",
@@ -59,8 +59,9 @@ if 'page' not in st.session_state:
 
 def go_page(idx: int):
     st.session_state['page'] = idx
-    st.experimental_rerun()
 
+
+# --- 各ページ関数 ---
 # --- P0: 開始 ---
 def page_0():
     st.markdown("# チェックシート診断へようこそ\n所要時間 3 分・全 20 問・回答は匿名可")
@@ -169,7 +170,7 @@ def page_3():
 
 # --- ページ描画 ---
 page_funcs = {0: page_0, 1: page_1, 2: page_2, 3: page_3}
-page_funcs.get(st.session_state['page'], page_0)()
+page_funcs[st.session_state['page']]()
 
 # --- サイドバー ---
 with st.sidebar:
