@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from utils import load_data, append_row, admin_gate, COMMON_QUESTIONS, THEME_QUESTIONS
+from utils import load_data, append_row, admin_gate, COMMON_QUESTIONS, THEME_SIGNAL_KEYS, THEME_QUESTIONS
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -49,7 +49,7 @@ THEME_INFO = {
     "⑨": {"label":"現場KPIと利益の関係を見える化する","problem":"改善活動が利益にどう影響するか曖昧で説明しづらい","solution":"KPIと利益の因果を可視化し納得感ある説明を提供する","approach":"稼働率や不良率と利益を結びつけ改善効果を数値化・表示する"},
     "⑩": {"label":"中期経営計画の実現性を評価する","problem":"目標の実現可能性が直感に頼り根拠が弱い","solution":"過去実績を基に達成確率を定量試算し根拠ある計画を支援する","approach":"実績と現状トレンドを組み合わせ達成見込みを自動算出する"}
 }
-THEME_ORDER = list(THEME_INFO.keys())
+THEME_ORDER = list(THEME_QUESTIONS.keys())
 THEME_LABELS = [f"{t} {THEME_INFO[t]['label']}" for t in THEME_ORDER]
 
 # --- ページ状態管理 ---
@@ -58,6 +58,7 @@ if 'page' not in st.session_state:
 
 def go_page(idx:int):
     st.session_state['page'] = idx
+    st.experimental_rerun()
 
 # --- P0: 開始 ---
 def page_0():
@@ -70,24 +71,27 @@ def page_1():
     st.header("全20問 一括回答")
     st.text_input("名前（任意）", key="user_name")
     st.text_input("所属（任意）", key="user_affil")
+    st.markdown("---")
     st.subheader("共通質問 (6問)")
-    for i,q in enumerate(COMMON_QUESTIONS):
-        cols=st.columns([3,2])
+    for i, q in enumerate(COMMON_QUESTIONS):
+        cols = st.columns([3,2])
         cols[0].write(COMMON_QUESTIONS_TEXT[i])
         cols[1].radio("", CHOICES, key=q, horizontal=True)
+    st.markdown("---")
     st.subheader("困りごとチェック (14問)")
-    for i,(_,qt) in enumerate(THEME_SIGNAL_QUESTIONS):
-        cols=st.columns([3,2])
-        cols[0].write(qt)
-        cols[1].radio("", CHOICES_SIGNAL, key=list(THEME_QUESTIONS.values())[i][0], horizontal=True)
+    for i, (_, qtext) in enumerate(THEME_SIGNAL_QUESTIONS):
+        key = THEME_SIGNAL_KEYS[i]
+        cols = st.columns([3,2])
+        cols[0].write(qtext)
+        cols[1].radio("", CHOICES_SIGNAL, key=key, horizontal=True)
     if st.button("診断結果を見る"):
-        if all(st.session_state.get(q) for q in COMMON_QUESTIONS) and all(st.session_state.get(k) for k in sum(THEME_QUESTIONS.values(),[])):
-            ans={'user_name':st.session_state.user_name,'user_affil':st.session_state.user_affil}
-            for q in COMMON_QUESTIONS: ans[q]=CHOICE_MAP[st.session_state[q]]
-            for t,qs in THEME_QUESTIONS.items():
-                ans[f"{t}_Q1"]=CHOICE_MAP_SIGNAL[st.session_state[qs[0]]]
-                ans[f"{t}_Q2"]=CHOICE_MAP_SIGNAL[st.session_state[qs[1]]]
-            st.session_state['answers']=ans
+        if all(st.session_state.get(q) for q in COMMON_QUESTIONS) and all(st.session_state.get(k) for k in THEME_SIGNAL_KEYS):
+            ans = {'user_name': st.session_state.user_name, 'user_affil': st.session_state.user_affil}
+            for q in COMMON_QUESTIONS:
+                ans[q] = CHOICE_MAP[st.session_state[q]]
+            for k in THEME_SIGNAL_KEYS:
+                ans[k] = CHOICE_MAP_SIGNAL[st.session_state[k]]
+            st.session_state['answers'] = ans
             append_row(ans)
             go_page(2)
         else:
@@ -96,40 +100,56 @@ def page_1():
 # --- P2: 診断結果＋組織ダッシュボード ---
 def page_2():
     st.header("診断結果・組織ダッシュボード")
-    df=load_data()
-    row=st.session_state.get('answers',{})
+    df = load_data()
+    row = st.session_state.get('answers', {})
+
     # 個人診断
-    if row and all(q in row for q in COMMON_QUESTIONS+sum(THEME_QUESTIONS.values(),[])):
-        common_avg=sum(row[q] for q in COMMON_QUESTIONS)/len(COMMON_QUESTIONS)
-        scores={t:0.4*common_avg+0.6*((row[f"{t}_Q1"]+row[f"{t}_Q2"])/2) for t in THEME_ORDER}
-        top=max(scores,key=scores.get);info=THEME_INFO[top]
+    if row and all(q in row for q in COMMON_QUESTIONS + THEME_SIGNAL_KEYS):
+        common_avg = sum(row[q] for q in COMMON_QUESTIONS) / len(COMMON_QUESTIONS)
+        scores = {t: 0.4*common_avg + 0.6*((row[f"{t}_Q1"] + row[f"{t}_Q2"]) / 2) for t in THEME_ORDER}
+        top = max(scores, key=scores.get)
+        info = THEME_INFO[top]
+
         st.subheader("あなたの診断結果")
         st.write(f"**選定テーマ**：{info['label']}")
-        st.write(f"- 問題：{info['problem']}")
-        st.write(f"- 解決策：{info['solution']}")
-        st.write(f"- アプローチ：{info['approach']}")
-        # 棒グラフ（縦棒）
-        bar=px.bar(x=THEME_LABELS,y=[scores[t] for t in THEME_ORDER],labels={'x':'テーマ','y':'スコア'},range_y=[0,100])
-        st.plotly_chart(bar,use_container_width=True)
-        # レーダー
-        df_r=pd.DataFrame({"テーマ":THEME_LABELS+THEME_LABELS[:1],"スコア":[scores[t] for t in THEME_ORDER]+[scores[THEME_ORDER[0]]]})
-        radar=px.line_polar(df_r,r="スコア",theta="テーマ",line_close=True,range_r=[0,100],markers=True)
-        st.plotly_chart(radar,use_container_width=True)
+        st.write(f"- **問題**：{info['problem']}")
+        st.write(f"- **解決策**：{info['solution']}")
+        st.write(f"- **アプローチ**：{info['approach']}")
+
+        # 縦棒グラフ (x=テーマ, y=スコア)
+        bar = px.bar(x=THEME_LABELS, y=[scores[t] for t in THEME_ORDER],
+                     labels={'x':'テーマ','y':'スコア'}, range_y=[0,100])
+        st.plotly_chart(bar, use_container_width=True)
+
+        # レーダーチャート
+        radar_df = pd.DataFrame({
+            "テーマ": THEME_LABELS + [THEME_LABELS[0]],
+            "スコア": [scores[t] for t in THEME_ORDER] + [scores[THEME_ORDER[0]]]
+        })
+        radar = px.line_polar(radar_df, r="スコア", theta="テーマ",
+                              line_close=True, range_r=[0,100], markers=True)
+        st.plotly_chart(radar, use_container_width=True)
+
         if st.button("この内容で保存"):
-            append_row(row);st.success("回答を保存しました")
+            append_row(row)
+            st.success("回答を保存しました")
     else:
         st.warning("個人診断は未回答のためスキップします。")
+
     st.markdown("---")
     st.subheader("組織ダッシュボード")
     st.write(f"回答者数：{len(df)} 名")
+
     # 散布図
-    data=[]
+    scatter_data = []
     for t in THEME_ORDER:
-        for _,r in df.iterrows():
-            data.append({"テーマ":THEME_INFO[t]['label'],"スコア":(r[f"{t}_Q1"]+r[f"{t}_Q2"])/2})
-    df_s=pd.DataFrame(data)
-    scat=px.strip(df_s,x="テーマ",y="スコア",labels={'テーマ':'テーマ','スコア':'スコア'})
-    st.plotly_chart(scat,use_container_width=True)
+        for _, r in df.iterrows():
+            scatter_data.append({"テーマ": THEME_INFO[t]['label'], "スコア": (r[f"{t}_Q1"] + r[f"{t}_Q2"]) / 2})
+    scatter_df = pd.DataFrame(scatter_data)
+    scatter = px.strip(scatter_df, x="テーマ", y="スコア",
+                       labels={'テーマ':'テーマ','スコア':'スコア'})
+    st.plotly_chart(scatter, use_container_width=True)
+
     if st.button("最新データで更新"):
         go_page(2)
     if st.button("アンケートに戻る"):
@@ -138,17 +158,21 @@ def page_2():
 # --- P3: 管理者画面 ---
 def page_3():
     st.header("回答一覧・管理者専用")
-    if not admin_gate(): return
-    df=load_data();st.dataframe(df)
-    st.download_button("CSVダウンロード",df.to_csv(index=False),file_name="responses.csv")
-    if st.button("アンケートに戻る"): go_page(1)
+    if not admin_gate():
+        return
+    df = load_data()
+    st.dataframe(df)
+    st.download_button("CSVダウンロード", df.to_csv(index=False), file_name="responses.csv")
+    if st.button("アンケートに戻る"):
+        go_page(1)
 
 # --- ページ描画 ---
-pages={0:page_0,1:page_1,2:page_2,3:page_3}
-pages.get(st.session_state['page'],page_0)()
+page_funcs = {0: page_0, 1: page_1, 2: page_2, 3: page_3}
+page_funcs.get(st.session_state['page'], page_0)()
 
 # --- サイドバー ---
 with st.sidebar:
     st.title("ページ移動")
-    for i,name in enumerate(["開始","質問入力","診断","管理"]):
-        if st.button(name): go_page(i)
+    for i, name in enumerate(["開始","質問入力","診断","管理"]):
+        if st.button(name):
+            go_page(i)
