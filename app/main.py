@@ -202,7 +202,7 @@ def page_2():
     <div style='background:#f0f6ff;padding:1em 1.5em 1em 1.5em;border-radius:10px;margin-bottom:1em;'>
     <span style='font-size:1.2em;font-weight:bold;color:#1a4b7a;'>選定テーマ：{THEME_INFO[top_theme]['label']}（{THEME_ALPHA[top_theme]}）</span><br>
     <span style='color:#333'><b>問題:</b> {top_info['problem']}<br>
-    <b>課題:</b> {top_info['task']}<br>
+    <b>解決策:</b> {top_info['task']}<br>
     <b>アプローチ:</b> {top_info['approach']}</span>
     </div>
     """, unsafe_allow_html=True)
@@ -277,7 +277,7 @@ def page_2():
             <div style='background:#f0f6ff;padding:1em 1.5em 1em 1.5em;border-radius:10px;margin-bottom:1em;'>
             <span style='font-size:1.1em;font-weight:bold;color:#1a4b7a;'>候補テーマ：{THEME_INFO[t]['label']}（{THEME_ALPHA[t]}）</span><br>
             <span style='color:#333'><b>問題:</b> {info['problem']}<br>
-            <b>課題:</b> {info['task']}<br>
+            <b>解決策:</b> {info['task']}<br>
             <b>アプローチ:</b> {info['approach']}</span>
             </div>
             """, unsafe_allow_html=True)
