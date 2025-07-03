@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from utils import load_data, append_row, admin_gate, COMMON_QUESTIONS, THEME_SIGNAL_KEYS, THEME_QUESTIONS
+from utils import load_data, append_row, admin_gate, COMMON_QUESTIONS, THEME_QUESTIONS
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -50,13 +50,14 @@ THEME_INFO = {
     "⑩": {"label":"中期経営計画の実現性を評価する","problem":"目標の実現可能性が直感に頼り根拠が弱い","solution":"過去実績を基に達成確率を定量試算し根拠ある計画を支援する","approach":"実績と現状トレンドを組み合わせ達成見込みを自動算出する"}
 }
 THEME_ORDER = list(THEME_QUESTIONS.keys())
+THEME_SIGNAL_KEYS = sum(THEME_QUESTIONS.values(), [])
 THEME_LABELS = [f"{t} {THEME_INFO[t]['label']}" for t in THEME_ORDER]
 
 # --- ページ状態管理 ---
 if 'page' not in st.session_state:
     st.session_state['page'] = 0
 
-def go_page(idx:int):
+def go_page(idx: int):
     st.session_state['page'] = idx
     st.experimental_rerun()
 
